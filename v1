@@ -4,10 +4,10 @@
 
 # Check if sudo can be used or not
 
-echo "[?] Checking if sudo is installed and can be used..."
+echo "$(date) [?] Checking if sudo is installed and can be used..."
 if ! command -v sudo &> /dev/null
 then
-    echo "[!] sudo is not installed. Some commands may fail."
+    echo "$(date) [!] sudo is not installed. Some commands may fail."
 	sudoInstalled=false
 else
 	sudoInstalled=true
@@ -15,64 +15,117 @@ fi
 
 # Sets sudo or leaves empty string
 
-echo "[+] Placing 'sudo' where needed..."
 if [ "$sudoInstalled" = true ]; 
 then
 	addSudo="sudo"
-	echo "[✓] sudo added."
+	echo "$(date) [✓] sudo added."
 else
-	addSudo = ""
+	addSudo=""
 fi
 
-# [?] Check if Docker is installed... 
+# Check if Docker is installed
+
+echo "$(date) [?] Check if Docker is installed..."
 
 if command -v docker &> /dev/null
 then
-	echo "[!] Docker is installed. Uninstalling..."
-	for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do $addSudo apt-get remove $pkg; done
-	echo "[✓] Docker succesfully uninstalled."
+	echo "$(date) [!] Docker is installed. Uninstalling..."
+	for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do $addSudo apt-get remove -y $pkg; done
+	echo "$(date) [✓] Docker succesfully uninstalled."
 else
-	echo "[!] Docker is not installed. Proceeding with installation..."
+	echo "$(date) [!] Docker is not installed. Proceeding with installation..."
 fi
 
 # Setting up Dockers apt repository
 
+echo "$(date) [+] Updating package lists..."
 
-echo "[+] Getting Docker's official GPG key..."
-"$addSudo" apt-get update
-"$addSudo" apt-get install ca-certificates curl
+"$addSudo" apt-get -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+
+# Check if apt-get update was successful
+if [ $? -eq 0 ]; then
+    echo "$(date) [✓] Package lists successfully updated."
+else
+    echo "$(date) [!] Failed to update package lists. Exiting script. Please check your internet connection."
+    exit 1 
+fi
+
+echo "$(date) [+] Install ca-certificates and curl"
+
+"$addSudo" apt-get -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y ca-certificates curl
+
+# Check if apt-get install was successful
+if [ $? -eq 0 ]; then
+    echo "$(date) [✓] ca-certificates and curl successfully installed."
+else
+    echo "$(date) [!] Failed to install ca-certificates and curl. Exiting script."
+    exit 1  # Exit if installation fails
+fi
+
+
 "$addSudo" install -m 0755 -d /etc/apt/keyrings
-"$addSudo" curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+echo "$(date) [✓] Installation successfull"
+
+# Loop to attempt downloading GPG key; Timeout after two tries
+
+attempt=1
+maxRetries=2
+
+while [ $attempt -le $maxRetries ]; do
+    echo "$(date) [+] Getting Docker's official GPG key..."
+
+    # Try to fetch the Docker GPG key
+    "$addSudo" curl --max-time 20 -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+
+    # Check if curl was successful
+    if [ $? -eq 0 ]; then
+        echo "$(date) [✓] GPG key successfully added."
+        break
+    else
+        echo "$(date) [!] Failed to download Docker GPG key. Retry $attempt of $maxRetries."
+    fi
+
+    # If reached max retries, exit the script
+    if [ $attempt -eq $maxRetries ]; then
+        echo "$(date) [!] Failed to download Docker GPG key after $maxRetries attempts. Please check your internet connection."
+        exit 1
+    fi
+
+    # Retry logic: increment the attempt counter and retry
+    ((attempt++))
+done
+
 "$addSudo" chmod a+r /etc/apt/keyrings/docker.asc
 
-echo "[✓] GPG key successfully added."
+echo "$(date) [✓] GPG key successfully added."
 
 # Adding repository to apt sources
 
-echo "[+] Adding repository to apt sources..."
+echo "$(date) [+] Adding repository to apt sources..."
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   "$addSudo" tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-echo "[✓] Successfully added the repository to apt sources."
-echo "[+] Updating repository..."
+echo "$(date) [✓] Successfully added the repository to apt sources."
+echo "$(date) [+] Updating repository..."
 "$addSudo" apt-get update
 
 # Installing the latest Docker version and dependencies
 
-echo "[+] Installing Docker..."
-"$addSudo" apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+echo "$(date) [+] Installing Docker..."
+"$addSudo" apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 
 # Verifying Installation
 
-echo "[?] Checking Docker Installation
+echo "$(date) [?] Checking Docker Installation"
 "$addSudo" docker run hello-world &> /dev/null
 
 if [ $? -eq 0 ]; then
-    echo "[✓]Docker is working correctly. Installation complete. Exiting Script."
-    # Proceed with the rest of your code
+    echo "$(date) [✓] Docker is working correctly. Installation complete. Exiting Script."
 else
-    echo "[!] Docker failed to run the hello-world container."
-    exit 1  # 
+    echo "$(date) [!] Docker failed to run the hello-world container."
+    exit 1 
 fi
+
+
