@@ -4,7 +4,7 @@
 
 # Check if sudo can be used or not
 
-echo "[?] Checking if sudo is installed and can be used...
+echo "[?] Checking if sudo is installed and can be used..."
 if ! command -v sudo &> /dev/null
 then
     echo "[!] sudo is not installed. Some commands may fail."
@@ -15,7 +15,7 @@ fi
 
 # Sets sudo or leaves empty string
 
-echo "[+]Placing 'sudo' where needed..."
+echo "[+] Placing 'sudo' where needed..."
 if [ "$sudoInstalled" = true ]; 
 then
 	addSudo="sudo"
@@ -28,7 +28,7 @@ fi
 
 if command -v docker &> /dev/null
 then
-	echo "[!] Docker is installed. Uninstalling...
+	echo "[!] Docker is installed. Uninstalling..."
 	for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do $addSudo apt-get remove $pkg; done
 	echo "[✓] Docker succesfully uninstalled."
 else
